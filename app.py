@@ -1,5 +1,8 @@
 from flask import Flask, render_template, request, jsonify
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 
 app = Flask(__name__)
 
