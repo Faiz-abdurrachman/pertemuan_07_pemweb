@@ -1,0 +1,245 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard Kantin Real-Time{% endblock %}
+
+{% block content %}
+    <!-- 1. KARTU CUACA KAMPUS REAL-TIME (OPEN-METEO SATELIT) -->
+    <section class="weather-section" id="weather-card">
+        <div class="weather-inner" id="cuaca-container">
+            <div class="weather-loading">
+                <i data-lucide="loader" class="spin"></i> Menghubungkan ke satelit Open-Meteo...
+            </div>
+        </div>
+    </section>
+
+    <!-- 2. GRID DUA SISI: FORM INPUT (KIRI) & TABEL REAL-TIME (KANAN) -->
+    <div class="dashboard-grid">
+        
+        <!-- SISI KIRI: FORMULIR TAMBAH MENU (POST) -->
+        <section class="card-panel">
+            <div class="panel-header">
+                <h2>Tambah Menu Kantin</h2>
+                <span class="badge-post">POST /api/menu</span>
+            </div>
+            <p class="panel-desc">Kirim data baru ke server secara asinkron tanpa reload browser.</p>
+
+            <form id="form-tambah-menu" onsubmit="handleTambahMenu(event)" class="form-vertical">
+                <div class="form-group">
+                    <label for="input-nama">Nama Menu</label>
+                    <input type="text" id="input-nama" placeholder="Contoh: Soto Ayam Lamongan" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="input-kategori">Kategori</label>
+                        <select id="input-kategori">
+                            <option value="Makanan">Makanan</option>
+                            <option value="Minuman">Minuman</option>
+                            <option value="Camilan">Camilan</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-harga">Harga (Rp)</label>
+                        <input type="number" id="input-harga" placeholder="15000" min="1000" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="input-stok">Jumlah Stok Porsi</label>
+                    <input type="number" id="input-stok" placeholder="20" min="1" value="20" required>
+                </div>
+
+                <button type="submit" id="btn-submit" class="btn-primary">
+                    <i data-lucide="plus-circle"></i> Tambah Menu ke Server
+                </button>
+            </form>
+
+            <div id="status-box" class="status-alert hidden"></div>
+        </section>
+
+        <!-- SISI KANAN: TABEL DAFTAR MENU (GET & DELETE) -->
+        <section class="card-panel">
+            <div class="panel-header">
+                <h2>Daftar Menu Real-Time</h2>
+                <div class="panel-actions">
+                    <span class="badge-get">GET /api/menu</span>
+                    <button type="button" onclick="muatMenu()" class="btn-refresh" title="Muat Ulang Data">
+                        <i data-lucide="refresh-cw"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            <p class="panel-desc">Tabel otomatis di-update oleh JavaScript DOM tanpa kedip reload.</p>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nama Menu</th>
+                            <th>Kategori</th>
+                            <th>Harga</th>
+                            <th>Stok</th>
+                            <th style="text-align:center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabel-menu-body">
+                        <!-- Baris tabel di-generate via JavaScript fetch() -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- RAW JSON VIEWER (DROPDOWN INSPECTOR) -->
+            <details class="json-inspector">
+                <summary>
+                    <span><i data-lucide="code"></i> Lihat Raw JSON Kiriman Server</span>
+                    <span class="arrow">▼</span>
+                </summary>
+                <pre id="raw-json-output">// JSON respon server akan muncul di sini setelah fetch...</pre>
+            </details>
+        </section>
+
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    lucide.createIcons();
+
+    // 1. FUNGSI MUAT MENU (GET /api/menu)
+    async function muatMenu() {
+        const tbody = document.getElementById('tabel-menu-body');
+        const jsonViewer = document.getElementById('raw-json-output');
+
+        try {
+            const res = await fetch('/api/menu');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+
+            jsonViewer.textContent = JSON.stringify(data, null, 2);
+
+            if (!data.data || data.data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:2rem;">Belum ada menu di kantin.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.data.map(item => `
+                <tr>
+                    <td class="font-mono font-bold">${item.id}</td>
+                    <td class="font-bold">${escapeHtml(item.nama)}</td>
+                    <td><span class="badge-tag tag-${item.kategori.toLowerCase()}">${item.kategori}</span></td>
+                    <td class="font-mono">Rp ${Number(item.harga).toLocaleString('id-ID')}</td>
+                    <td><span class="badge-stok">${item.stok} porsi</span></td>
+                    <td style="text-align:center">
+                        <button onclick="hapusMenu(${item.id}, '${escapeHtml(item.nama)}')" class="btn-delete" title="Hapus Menu">
+                            <i data-lucide="trash-2"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            lucide.createIcons();
+        } catch (err) {
+            console.error('Fetch GET gagal:', err);
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#ef4444;padding:1.5rem;">Gagal mengambil data dari Flask! Pastikan server python app.py menyala.</td></tr>';
+        }
+    }
+
+    // 2. FUNGSI TAMBAH MENU (POST /api/menu)
+    async function handleTambahMenu(event) {
+        event.preventDefault();
+        const btn = document.getElementById('btn-submit');
+        const statusBox = document.getElementById('status-box');
+
+        const payload = {
+            nama: document.getElementById('input-nama').value.trim(),
+            harga: Number(document.getElementById('input-harga').value),
+            kategori: document.getElementById('input-kategori').value,
+            stok: Number(document.getElementById('input-stok').value)
+        };
+
+        btn.disabled = true;
+        btn.textContent = 'Menyimpan ke Server...';
+
+        try {
+            const res = await fetch('/api/menu', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await res.json();
+            statusBox.classList.remove('hidden', 'alert-success', 'alert-error');
+
+            if (res.status === 201) {
+                statusBox.classList.add('alert-success');
+                statusBox.innerHTML = `<strong>201 Created:</strong> ${result.pesan}`;
+                document.getElementById('form-tambah-menu').reset();
+                await muatMenu(); // Update DOM instan tanpa reload!
+            } else {
+                statusBox.classList.add('alert-error');
+                statusBox.innerHTML = `<strong>Status ${res.status} Error:</strong> ${result.pesan}`;
+            }
+        } catch (err) {
+            console.error('Fetch POST gagal:', err);
+            statusBox.classList.remove('hidden');
+            statusBox.classList.add('alert-error');
+            statusBox.textContent = 'Gagal menghubungi server Flask!';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="plus-circle"></i> Tambah Menu ke Server';
+            lucide.createIcons();
+        }
+    }
+
+    // 3. FUNGSI HAPUS MENU (DELETE /api/menu/<id>)
+    async function hapusMenu(id, nama) {
+        if (!confirm(`Hapus "${nama}" (ID: ${id}) dari daftar kantin?`)) return;
+
+        try {
+            const res = await fetch(`/api/menu/${id}`, { method: 'DELETE' });
+            const result = await res.json();
+            if (res.ok) {
+                await muatMenu();
+            } else {
+                alert('Gagal: ' + result.pesan);
+            }
+        } catch (err) {
+            alert('Gagal menghubungi server!');
+        }
+    }
+
+    // 4. FUNGSI MUAT CUACA KAMPUS (GET /api/cuaca-kampus)
+    async function muatCuaca() {
+        const container = document.getElementById('cuaca-container');
+        try {
+            const res = await fetch('/api/cuaca-kampus');
+            const data = await res.json();
+
+            container.innerHTML = `
+                <div class="weather-temp-box">
+                    <span class="weather-deg">${data.suhu_celcius}°C</span>
+                    <span class="weather-label">Kampus Real-Time</span>
+                </div>
+                <div class="weather-info-box">
+                    <div class="weather-title">Rekomendasi Menu Kantin Hari Ini</div>
+                    <div class="weather-desc">"${data.rekomendasi_menu}"</div>
+                </div>
+            `;
+        } catch (err) {
+            container.innerHTML = '<div style="color:#64748b;font-size:0.875rem;">Info cuaca satelit kampus sementara offline.</div>';
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        muatMenu();
+        muatCuaca();
+    });
+</script>
+{% endblock %}

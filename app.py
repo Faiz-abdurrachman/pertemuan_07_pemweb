@@ -56,7 +56,7 @@ def cari_menu_by_id(item_id):
 @app.route('/')
 @app.route('/dashboard')
 def dashboard():
-    return render_template('dashboard.html')
+    return render_template('index.html')
 
 
 # ====================================================================

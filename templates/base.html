@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Kantin Kampus REST API{% endblock %} - Pemrograman Web</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+    <!-- NAVBAR KANTIN KAMPUS (KONSISTEN DENGAN P01 - P06) -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="brand-logo">
+                <span class="brand-icon">■</span> Kantin Kampus
+                <span class="brand-badge">P-07: REST API</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="/" class="active">Dashboard Real-Time</a></li>
+                <li><a href="/api/menu" target="_blank" class="btn-api">Lihat Raw JSON &rarr;</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT INHERITANCE CONTAINER (JINJA2 BLOCK) -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- FOOTER KANTIN KAMPUS -->
+    <footer class="footer">
+        <div class="footer-container">
+            <p>&copy; 2026 Kantin Kampus &bull; Modul Praktikum Pemrograman Web P07 (Networking &amp; Integrasi API)</p>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
