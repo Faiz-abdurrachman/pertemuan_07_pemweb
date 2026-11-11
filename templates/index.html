@@ -63,7 +63,9 @@
             <div class="panel-header">
                 <h2>Daftar Menu Real-Time</h2>
                 <div class="panel-actions">
-                    <span class="badge-get">GET /api/menu</span>
+                    <span class="badge-get">GET</span>
+                    <span class="badge-put">PUT</span>
+                    <span class="badge-delete">DELETE</span>
                     <button type="button" onclick="muatMenu()" class="btn-refresh" title="Muat Ulang Data">
                         <i data-lucide="refresh-cw"></i> Refresh
                     </button>
@@ -100,6 +102,42 @@
         </section>
 
     </div>
+
+    <!-- 3. MODAL DIALOG EDIT MENU (PUT /api/menu/<id>) -->
+    <div id="modal-edit" class="modal-backdrop hidden" onclick="if(event.target === this) tutupModalEdit()">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <h3 id="modal-edit-title">Edit Menu</h3>
+                    <span class="badge-put">PUT /api/menu/&lt;id&gt;</span>
+                </div>
+                <button type="button" class="btn-close" onclick="tutupModalEdit()" title="Tutup">&times;</button>
+            </div>
+            <form id="form-edit-menu" onsubmit="handleEditMenu(event)" class="form-vertical">
+                <input type="hidden" id="edit-id">
+                <div class="form-group">
+                    <label for="edit-nama">Nama Menu</label>
+                    <input type="text" id="edit-nama" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-harga">Harga (Rp)</label>
+                        <input type="number" id="edit-harga" min="1000" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-stok">Stok Porsi</label>
+                        <input type="number" id="edit-stok" min="0" required>
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
+                    <button type="button" class="btn-secondary" onclick="tutupModalEdit()">Batal</button>
+                    <button type="submit" id="btn-submit-edit" class="btn-primary">
+                        <i data-lucide="save"></i> Simpan Perubahan (PUT)
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 {% endblock %}
 
 {% block scripts %}
@@ -131,9 +169,14 @@
                     <td class="font-mono">Rp ${Number(item.harga).toLocaleString('id-ID')}</td>
                     <td><span class="badge-stok">${item.stok} porsi</span></td>
                     <td style="text-align:center">
-                        <button onclick="hapusMenu(${item.id}, '${escapeHtml(item.nama)}')" class="btn-delete" title="Hapus Menu">
-                            <i data-lucide="trash-2"></i>
-                        </button>
+                        <div class="action-btn-group">
+                            <button onclick="bukaModalEdit(${item.id}, '${escapeHtml(item.nama)}', ${item.harga}, ${item.stok})" class="btn-edit" title="Edit Menu (PUT)">
+                                <i data-lucide="edit-3"></i>
+                            </button>
+                            <button onclick="hapusMenu(${item.id}, '${escapeHtml(item.nama)}')" class="btn-delete" title="Hapus Menu (DELETE)">
+                                <i data-lucide="trash-2"></i>
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `).join('');
@@ -192,7 +235,57 @@
         }
     }
 
-    // 3. FUNGSI HAPUS MENU (DELETE /api/menu/<id>)
+    // 3. FUNGSI EDIT MENU (PUT /api/menu/<id>)
+    function bukaModalEdit(id, nama, harga, stok) {
+        document.getElementById('edit-id').value = id;
+        document.getElementById('edit-nama').value = nama;
+        document.getElementById('edit-harga').value = harga;
+        document.getElementById('edit-stok').value = stok;
+        document.getElementById('modal-edit-title').textContent = `Edit Menu #${id}`;
+        document.getElementById('modal-edit').classList.remove('hidden');
+        lucide.createIcons();
+    }
+
+    function tutupModalEdit() {
+        document.getElementById('modal-edit').classList.add('hidden');
+    }
+
+    async function handleEditMenu(event) {
+        event.preventDefault();
+        const id = document.getElementById('edit-id').value;
+        const btn = document.getElementById('btn-submit-edit');
+        const payload = {
+            nama: document.getElementById('edit-nama').value.trim(),
+            harga: Number(document.getElementById('edit-harga').value),
+            stok: Number(document.getElementById('edit-stok').value)
+        };
+
+        btn.disabled = true;
+        btn.textContent = 'Menyimpan...';
+
+        try {
+            const res = await fetch(`/api/menu/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json();
+            if (res.ok) {
+                tutupModalEdit();
+                await muatMenu();
+            } else {
+                alert('Gagal update: ' + (result.pesan || 'Error'));
+            }
+        } catch (err) {
+            alert('Gagal menghubungi server!');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="save"></i> Simpan Perubahan (PUT)';
+            lucide.createIcons();
+        }
+    }
+
+    // 4. FUNGSI HAPUS MENU (DELETE /api/menu/<id>)
     async function hapusMenu(id, nama) {
         if (!confirm(`Hapus "${nama}" (ID: ${id}) dari daftar kantin?`)) return;
 
